@@ -1,0 +1,28 @@
+test-back-end.md
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# truck-api
+truck-api/node_modules/
+truck-api/dist/
+truck-api/.env
+
+# truck-worker
+truck-worker/node_modules/
+truck-worker/dist/
+truck-worker/.env
+
+# Docker
+docker-compose.override.yml
+*.pid
+*.seed
+*.pid.lock
+
+# Testing
+coverage/
+.nyc_output/

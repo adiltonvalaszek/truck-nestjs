@@ -1,0 +1,158 @@
+services:
+  # ==================== INFRASTRUCTURE ====================
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: truck-postgres
+    environment:
+      POSTGRES_USER: truck
+      POSTGRES_PASSWORD: truck123
+      POSTGRES_DB: truckdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U truck" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - truck-network
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: truck-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - truck-network
+
+  mongodb:
+    image: mongo:8.0
+    container_name: truck-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - truck-network
+
+  pubsub-emulator:
+    image: google/cloud-sdk:latest
+    platform: linux/amd64
+    container_name: truck-pubsub
+    command: gcloud beta emulators pubsub start --host-port=0.0.0.0:8085
+    ports:
+      - "8085:8085"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8085" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - truck-network
+
+  pubsub-init:
+    image: google/cloud-sdk:latest
+    platform: linux/amd64
+    container_name: truck-pubsub-init
+    depends_on:
+      pubsub-emulator:
+        condition: service_healthy
+    environment:
+      PUBSUB_EMULATOR_HOST: pubsub-emulator:8085
+      PUBSUB_PROJECT_ID: truck-nestjs
+      CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+    command: >
+      bash -c "
+        export PUBSUB_EMULATOR_HOST=pubsub-emulator:8085 &&
+        gcloud config set project truck-nestjs &&
+        gcloud config set auth/disable_credentials true &&
+        gcloud pubsub topics create load.assigned --project=truck-nestjs 2>/dev/null || echo 'Topic already exists' &&
+        gcloud pubsub subscriptions create load.assigned-sub --topic=load.assigned --project=truck-nestjs 2>/dev/null || echo 'Subscription already exists' &&
+        echo '✅ Pub/Sub topics and subscriptions created successfully'
+      "
+    networks:
+      - truck-network
+
+  # ==================== MICROSERVICES ====================
+
+  truck-api:
+    build:
+      context: ./truck-api
+      dockerfile: Dockerfile
+    container_name: truck-api
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pubsub-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://truck:truck123@postgres:5432/truckdb
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PUBSUB_EMULATOR_HOST: pubsub-emulator:8085
+      PUBSUB_PROJECT_ID: truck-nestjs
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production-please}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-24h}
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - truck-network
+    # Uncomment for development with hot reload
+    volumes:
+      - ./truck-api/src:/app/src
+
+  truck-worker:
+    build:
+      context: ./truck-worker
+      dockerfile: Dockerfile
+    container_name: truck-worker
+    depends_on:
+      truck-api:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      pubsub-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      MONGODB_URL: mongodb://mongodb:27017/truck-audit
+      PUBSUB_EMULATOR_HOST: pubsub-emulator:8085
+      PUBSUB_PROJECT_ID: truck-nestjs
+      PUBSUB_SUBSCRIPTION: load.assigned-sub
+    networks:
+      - truck-network
+    # Uncomment for development with hot reload
+    volumes:
+      - ./truck-worker/src:/app/src
+
+volumes:
+  postgres_data:
+  mongo_data:
+
+
+networks:
+  truck-network:
+    driver: bridge
