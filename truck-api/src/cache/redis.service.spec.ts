@@ -44,7 +44,7 @@ describe('RedisService', () => {
 
   describe('onModuleInit', () => {
     it('should create client and connect to Redis', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const loggerSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
 
       await service.onModuleInit();
 
@@ -56,9 +56,9 @@ describe('RedisService', () => {
       });
       expect(mockRedisClient.on).toHaveBeenCalledWith('error', expect.any(Function));
       expect(mockRedisClient.connect).toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalledWith('✅ Connected to Redis');
+      expect(loggerSpy).toHaveBeenCalledWith('✅ Connected to Redis');
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should use environment variables for Redis configuration', async () => {
@@ -82,6 +82,7 @@ describe('RedisService', () => {
   describe('onModuleDestroy', () => {
     it('should quit the Redis client', async () => {
       await service.onModuleInit();
+      mockRedisClient.isOpen = true; // Set client as open
       await service.onModuleDestroy();
 
       expect(mockRedisClient.quit).toHaveBeenCalled();

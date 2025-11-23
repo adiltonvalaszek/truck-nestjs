@@ -16,6 +16,8 @@ describe('PubSubPublisherService', () => {
       publish: jest.fn(),
       publishMessage: jest.fn(),
       publishJSON: jest.fn(),
+      exists: jest.fn().mockResolvedValue([true]),
+      create: jest.fn().mockResolvedValue({}),
     };
 
     // Create mock PubSub instance
@@ -102,12 +104,17 @@ describe('PubSubPublisherService', () => {
     });
 
     it('should handle publishing errors gracefully', async () => {
+      // Mock logger to suppress error logs during test
+      const loggerSpy = jest.spyOn(service['logger'], 'error').mockImplementation();
+      
       // Mock publishing error
       const publishError = new Error('Pub/Sub publishing failed');
       mockTopic.publishMessage.mockRejectedValue(publishError);
 
       // Should not throw, but log the error
       await expect(service.publishLoadAssigned(mockAssignment)).resolves.not.toThrow();
+      
+      loggerSpy.mockRestore();
 
       expect(mockTopic.publishMessage).toHaveBeenCalledWith({
         json: {
@@ -156,10 +163,15 @@ describe('PubSubPublisherService', () => {
     });
 
     it('should handle generic message publishing errors', async () => {
+      // Mock logger to suppress error logs during test
+      const loggerSpy = jest.spyOn(service['logger'], 'error').mockImplementation();
+      
       const publishError = new Error('Generic publishing failed');
       mockTopic.publishMessage.mockRejectedValue(publishError);
 
       await expect(service.publishMessage(mockTopicName, mockData)).resolves.not.toThrow();
+      
+      loggerSpy.mockRestore();
 
       expect(mockTopic.publishMessage).toHaveBeenCalledWith({
         json: mockData,
