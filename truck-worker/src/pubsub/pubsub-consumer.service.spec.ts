@@ -18,8 +18,12 @@ describe('PubSubConsumerService', () => {
   };
 
   beforeEach(async () => {
+    // Set NODE_ENV to non-test for these specific tests
+    process.env.NODE_ENV = 'development';
+
     mockSubscription = {
       on: jest.fn(),
+      exists: jest.fn().mockResolvedValue([true]),
     };
 
     mockPubSub = {
@@ -44,6 +48,8 @@ describe('PubSubConsumerService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    // Reset NODE_ENV to test
+    process.env.NODE_ENV = 'test';
   });
 
   it('should be defined', () => {
@@ -52,7 +58,7 @@ describe('PubSubConsumerService', () => {
 
   describe('onModuleInit', () => {
     it('should initialize PubSub with default configuration', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const loggerSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
 
       service.onModuleInit();
 
@@ -61,9 +67,9 @@ describe('PubSubConsumerService', () => {
         apiEndpoint: undefined,
       });
       expect(mockPubSub.subscription).toHaveBeenCalledWith('load.assigned-sub');
-      expect(consoleSpy).toHaveBeenCalledWith('✅ Pub/Sub Consumer initialized');
+      expect(loggerSpy).toHaveBeenCalledWith('✅ Pub/Sub Consumer initialized');
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should use environment variables for configuration', () => {
@@ -101,19 +107,19 @@ describe('PubSubConsumerService', () => {
     });
 
     it('should set up message and error handlers', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const loggerSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
 
       await service.start();
 
-      expect(consoleSpy).toHaveBeenCalledWith('🔄 Starting to listen for messages...');
+      expect(loggerSpy).toHaveBeenCalledWith('📡 Listening for Pub/Sub events...');
       expect(mockSubscription.on).toHaveBeenCalledWith('message', expect.any(Function));
       expect(mockSubscription.on).toHaveBeenCalledWith('error', expect.any(Function));
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should process valid messages successfully', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const loggerSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
       mockMongoDBService.recordAuditEvent.mockResolvedValue({ insertedId: 'audit-123' });
 
       await service.start();
@@ -121,18 +127,21 @@ describe('PubSubConsumerService', () => {
       // Get the message handler function
       const messageHandler = mockSubscription.on.mock.calls.find(
         call => call[0] === 'message'
-      )[1];
+      )?.[1];
 
       const mockMessage = {
         data: Buffer.from(JSON.stringify({
-          driverId: 'driver-123',
-          loadId: 'load-456',
-          assignmentId: 'assignment-789',
-          driverName: 'John Doe',
-          loadOrigin: 'New York',
-          loadDestination: 'Boston',
-          cargoType: 'Electronics',
-          assignedAt: '2023-01-01T00:00:00Z',
+          type: 'LOAD_ASSIGNED',
+          data: {
+            driverId: 'driver-123',
+            loadId: 'load-456',
+            assignmentId: 'assignment-789',
+            driverName: 'John Doe',
+            loadOrigin: 'New York',
+            loadDestination: 'Boston',
+            cargoType: 'Electronics',
+            assignedAt: '2023-01-01T00:00:00Z',
+          }
         })),
         ack: jest.fn(),
         nack: jest.fn(),
@@ -145,6 +154,8 @@ describe('PubSubConsumerService', () => {
         loadId: 'load-456',
         type: 'LOAD_ASSIGNED',
         payload: {
+          driverId: 'driver-123',
+          loadId: 'load-456',
           assignmentId: 'assignment-789',
           driverName: 'John Doe',
           loadOrigin: 'New York',
@@ -154,23 +165,22 @@ describe('PubSubConsumerService', () => {
         },
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith('📨 Received message:', expect.any(Object));
-      expect(consoleSpy).toHaveBeenCalledWith('📧 [SIMULATED] Notification sent to driver John Doe');
-      expect(consoleSpy).toHaveBeenCalledWith('   Load: New York → Boston');
-      expect(consoleSpy).toHaveBeenCalledWith('✅ Message acknowledged');
+      expect(loggerSpy).toHaveBeenCalledWith('📨 Received message:', expect.any(String));
+      expect(loggerSpy).toHaveBeenCalledWith('📧 [SIMULATED] Notification sent to driver');
+      expect(loggerSpy).toHaveBeenCalledWith('✅ Message acknowledged');
       expect(mockMessage.ack).toHaveBeenCalled();
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should handle invalid JSON messages', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const loggerErrorSpy = jest.spyOn(service['logger'], 'error').mockImplementation();
 
       await service.start();
 
       const messageHandler = mockSubscription.on.mock.calls.find(
         call => call[0] === 'message'
-      )[1];
+      )?.[1];
 
       const mockMessage = {
         data: Buffer.from('invalid json'),
@@ -180,27 +190,30 @@ describe('PubSubConsumerService', () => {
 
       await messageHandler(mockMessage);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Error processing message:', expect.any(Error));
+      expect(loggerErrorSpy).toHaveBeenCalledWith('❌ Error processing message:', expect.any(Error));
       expect(mockMessage.nack).toHaveBeenCalled();
       expect(mockMessage.ack).not.toHaveBeenCalled();
 
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
     });
 
     it('should handle database errors during audit recording', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const loggerErrorSpy = jest.spyOn(service['logger'], 'error').mockImplementation();
       mockMongoDBService.recordAuditEvent.mockRejectedValue(new Error('Database error'));
 
       await service.start();
 
       const messageHandler = mockSubscription.on.mock.calls.find(
         call => call[0] === 'message'
-      )[1];
+      )?.[1];
 
       const mockMessage = {
         data: Buffer.from(JSON.stringify({
-          driverId: 'driver-123',
-          loadId: 'load-456',
+          type: 'LOAD_ASSIGNED',
+          data: {
+            driverId: 'driver-123',
+            loadId: 'load-456',
+          }
         })),
         ack: jest.fn(),
         nack: jest.fn(),
@@ -208,29 +221,29 @@ describe('PubSubConsumerService', () => {
 
       await messageHandler(mockMessage);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Error processing message:', expect.any(Error));
+      expect(loggerErrorSpy).toHaveBeenCalledWith('❌ Error processing message:', expect.any(Error));
       expect(mockMessage.nack).toHaveBeenCalled();
       expect(mockMessage.ack).not.toHaveBeenCalled();
 
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
     });
 
     it('should handle subscription errors', async () => {
-      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      const loggerErrorSpy = jest.spyOn(service['logger'], 'error').mockImplementation();
 
       await service.start();
 
       // Get the error handler function
       const errorHandler = mockSubscription.on.mock.calls.find(
         call => call[0] === 'error'
-      )[1];
+      )?.[1];
 
       const subscriptionError = new Error('Subscription connection lost');
       errorHandler(subscriptionError);
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith('❌ Subscription error:', subscriptionError);
+      expect(loggerErrorSpy).toHaveBeenCalledWith('❌ Subscription error:', subscriptionError);
 
-      consoleErrorSpy.mockRestore();
+      loggerErrorSpy.mockRestore();
     });
   });
 });

@@ -11,6 +11,12 @@ export class PubSubConsumerService implements OnModuleInit {
   constructor(private mongodbService: MongoDBService) {}
 
   onModuleInit() {
+    // Skip PubSub initialization in test environment
+    if (process.env.NODE_ENV === 'test') {
+      this.logger.log('🧪 Skipping Pub/Sub initialization in test environment');
+      return;
+    }
+
     this.pubsub = new PubSub({
       projectId: process.env.PUBSUB_PROJECT_ID || 'truck-nestjs',
       apiEndpoint: process.env.PUBSUB_EMULATOR_HOST,
@@ -24,6 +30,12 @@ export class PubSubConsumerService implements OnModuleInit {
   }
 
   async start() {
+    // Skip in test environment
+    if (process.env.NODE_ENV === 'test') {
+      this.logger.log('🧪 Skipping Pub/Sub listening in test environment');
+      return;
+    }
+
     this.logger.log('📡 Listening for Pub/Sub events...');
 
     try {

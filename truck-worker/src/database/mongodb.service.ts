@@ -1,8 +1,9 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { MongoClient, Db } from 'mongodb';
 
 @Injectable()
 export class MongoDBService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(MongoDBService.name);
   private client: MongoClient;
   private db: Db;
 
@@ -13,7 +14,7 @@ export class MongoDBService implements OnModuleInit, OnModuleDestroy {
     await this.client.connect();
     
     this.db = this.client.db();
-    console.log('✅ Connected to MongoDB');
+    this.logger.log('✅ Connected to MongoDB');
   }
 
   async onModuleDestroy() {
@@ -34,7 +35,7 @@ export class MongoDBService implements OnModuleInit, OnModuleDestroy {
     };
 
     const result = await collection.insertOne(document);
-    console.log(`✅ Audit event recorded: ${result.insertedId}`);
+    this.logger.log(`✅ Audit event recorded: ${result.insertedId}`);
     
     return result;
   }

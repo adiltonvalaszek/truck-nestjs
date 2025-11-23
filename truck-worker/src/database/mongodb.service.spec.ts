@@ -46,16 +46,16 @@ describe('MongoDBService', () => {
 
   describe('onModuleInit', () => {
     it('should connect to MongoDB with default URL', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const loggerSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
 
       await service.onModuleInit();
 
       expect(MongoClient).toHaveBeenCalledWith('mongodb://localhost:27017/truck-audit');
       expect(mockClient.connect).toHaveBeenCalled();
       expect(mockClient.db).toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalledWith('✅ Connected to MongoDB');
+      expect(loggerSpy).toHaveBeenCalledWith('✅ Connected to MongoDB');
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should use environment variable for MongoDB URL', async () => {
@@ -115,7 +115,7 @@ describe('MongoDBService', () => {
       const mockResult = { insertedId: 'audit-id-123' };
       mockCollection.insertOne.mockResolvedValue(mockResult as any);
 
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const loggerSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
 
       const result = await service.recordAuditEvent(eventData);
 
@@ -125,9 +125,9 @@ describe('MongoDBService', () => {
         timestamp: expect.any(Date),
       });
       expect(result).toEqual(mockResult);
-      expect(consoleSpy).toHaveBeenCalledWith('✅ Audit event recorded: audit-id-123');
+      expect(loggerSpy).toHaveBeenCalledWith('✅ Audit event recorded: audit-id-123');
 
-      consoleSpy.mockRestore();
+      loggerSpy.mockRestore();
     });
 
     it('should include timestamp in audit event', async () => {
