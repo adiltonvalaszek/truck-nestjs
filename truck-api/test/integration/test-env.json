@@ -1,1 +1,1 @@
-{"TEST_DB_URL":"postgresql://testuser:testpass@localhost:55003/testdb","REDIS_HOST":"localhost","REDIS_PORT":"55004"}
+{"TEST_DB_URL":"postgresql://testuser:testpass@localhost:55007/testdb","REDIS_HOST":"localhost","REDIS_PORT":"55008"}

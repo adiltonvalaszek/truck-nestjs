@@ -4,6 +4,10 @@
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-secret-key-for-integration-tests';
 
+// Configure PubSub for tests (disable or mock)
+process.env.PUBSUB_PROJECT_ID = 'test-project';
+process.env.PUBSUB_EMULATOR_HOST = 'localhost:8085';
+
 // Load test environment variables from globalSetup
 try {
   const fs = require('fs');

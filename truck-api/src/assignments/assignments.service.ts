@@ -36,7 +36,7 @@ export class AssignmentsService {
       createAssignmentDto.driverId,
     );
 
-    if (driver.status !== 'AVAILABLE') {
+    if (driver.status !== DriverStatus.AVAILABLE) {
       throw new BadRequestException('Driver is not available for assignment');
     }
 

@@ -8,6 +8,12 @@ export class PubSubPublisherService implements OnModuleInit {
   private topic: any;
 
   async onModuleInit() {
+    // Skip PubSub initialization in test environment
+    if (process.env.NODE_ENV === 'test') {
+      this.logger.log('🧪 Skipping Pub/Sub initialization in test environment');
+      return;
+    }
+
     this.pubsub = new PubSub({
       projectId: process.env.PUBSUB_PROJECT_ID || 'truck-nestjs',
       apiEndpoint: process.env.PUBSUB_EMULATOR_HOST,
@@ -31,6 +37,12 @@ export class PubSubPublisherService implements OnModuleInit {
   }
 
   async publishLoadAssigned(assignment: any) {
+    // Skip publishing in test environment
+    if (process.env.NODE_ENV === 'test') {
+      this.logger.log('🧪 Skipping Pub/Sub publishing in test environment');
+      return 'test-message-id';
+    }
+
     const payload = {
       type: 'LOAD_ASSIGNED',
       timestamp: new Date().toISOString(),
@@ -56,6 +68,12 @@ export class PubSubPublisherService implements OnModuleInit {
   }
 
   async publishMessage(topicName: string, data: any) {
+    // Skip publishing in test environment
+    if (process.env.NODE_ENV === 'test') {
+      this.logger.log(`🧪 Skipping Pub/Sub publishing to ${topicName} in test environment`);
+      return 'test-message-id';
+    }
+
     try {
       const topic = this.pubsub.topic(topicName);
       

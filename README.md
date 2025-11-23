@@ -197,7 +197,7 @@ truck-nestjs/
 │   │   ├── assignments/   # Assignment logic
 │   │   ├── cache/         # Redis service
 │   │   └── pubsub/        # Pub/Sub publisher
-│   ├── prisma/            # Database schema & migrations
+│   ├── test/              # E2E tests
 │   └── Dockerfile
 │
 ├── truck-worker/           # Event processor microservice
@@ -282,11 +282,3 @@ docker compose logs pubsub-init
 # Restart worker
 docker compose restart truck-worker
 ```
-
-## 📄 License
-
-MIT
-
-## 👨‍💻 Author
-
-Developed as part of the Billor Backend Challenge.
